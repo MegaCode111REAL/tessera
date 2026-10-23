@@ -11,3 +11,4 @@ xcuserdata/
 *.p12
 *.mobileprovision
 *.cer
+__pycache__/

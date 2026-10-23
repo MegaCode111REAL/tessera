@@ -14,6 +14,8 @@ jobs:
         run: swift --version
       - name: Test TesseraCore
         run: swift test
+      - name: Test fake-signing script
+        run: python3 scripts/test_fake_sign.py
 
   app-build:
     name: Build iOS app (simulator)
@@ -65,12 +67,22 @@ jobs:
           path: Tessera-unsigned.ipa
           retention-days: 30
       # Fake-signed copies of the REAL Tessera build, for testing Tessera's inspector on itself.
-      # They add a hand-built profile and a signature stub; they are not validly signed and will
-      # not install. See scripts/fake_sign_ipa.py.
+      # They add a fake signature blob to the binary and a hand-built profile; they are not validly
+      # signed and will not install or run. See scripts/fake_sign_ipa.py.
+      - name: Install ldid
+        run: brew install ldid
       - name: Make fake-signed variants
         run: |
-          python3 scripts/fake_sign_ipa.py Tessera-unsigned.ipa Tessera-fake-signed.ipa
-          python3 scripts/fake_sign_ipa.py Tessera-unsigned.ipa Tessera-fake-signed-expired.ipa --expired
+          # Prefer ldid (a genuine ad-hoc signature). If it fails, fall back to the script's
+          # built-in minimal fake signature and say so loudly.
+          sign() {
+            out="$1"; shift
+            if python3 scripts/fake_sign_ipa.py Tessera-unsigned.ipa "$out" "$@" --ldid; then return; fi
+            echo "::warning::ldid signing failed for $out; used the built-in fake signature instead"
+            python3 scripts/fake_sign_ipa.py Tessera-unsigned.ipa "$out" "$@"
+          }
+          sign Tessera-fake-signed.ipa
+          sign Tessera-fake-signed-expired.ipa --expired
       - uses: actions/upload-artifact@v4
         with:
           name: Tessera-fake-signed-ipas

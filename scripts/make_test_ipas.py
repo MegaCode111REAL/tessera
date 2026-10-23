@@ -214,3 +214,17 @@ write("signed-expired-profile.ipa", lambda zf: signed_app(
                     datetime.datetime(2021, 1, 1), "com.example.oldbuild",
                     ["00008030-000A11223344002E"], development=False),
     unsigned_extension=True))
+
+# 11. A binary laid out the way a linker emits it (__TEXT/__LINKEDIT, header padding), made fake-signed by
+#     scripts/fake_sign_ipa.py. Mirrors what CI does to the real Tessera build, so the Swift tests can
+#     check Tessera's Mach-O reader against it.
+import os
+import tempfile
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import fake_sign_ipa
+import test_fake_sign
+
+with tempfile.TemporaryDirectory() as tmp:
+    raw = os.path.join(tmp, "Tessera.ipa")
+    test_fake_sign.make_ipa(raw, test_fake_sign.realistic_macho())
+    print(fake_sign_ipa.fake_sign(raw, str(OUT / "tessera-like-fake-signed.ipa")))

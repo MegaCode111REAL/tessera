@@ -149,6 +149,25 @@ final class ImportFixturesTests: XCTestCase {
         XCTAssertTrue(issues.filter { $0.severity == .error }.isEmpty, "\(issues)")
     }
 
+    /// The binary here is laid out like a linker's output (header padding, __LINKEDIT last) and was
+    /// fake-signed by the same script CI runs on the real Tessera build, so this checks Tessera's
+    /// Mach-O reader against that exact transformation.
+    func testTesseraLikeBinaryWithAppendedSignatureReadsAsSigned() async throws {
+        let artifact = try await service.importArchive(from: fixture("tessera-like-fake-signed.ipa"))
+        let metadata = artifact.metadata
+        XCTAssertEqual(metadata.bundleIdentifier, "dev.tessera.app")
+        XCTAssertEqual(metadata.architectures, ["arm64"])
+        XCTAssertTrue(metadata.hasCodeSignature, "the appended LC_CODE_SIGNATURE was not detected")
+        XCTAssertEqual(metadata.existingEntitlements["application-identifier"], .string("TEAM123456.dev.tessera.app"))
+        XCTAssertEqual(metadata.existingEntitlements["get-task-allow"], .bool(true))
+        XCTAssertEqual(metadata.existingEntitlements.count, 4)
+        let profile = try XCTUnwrap(metadata.embeddedProfile)
+        XCTAssertEqual(profile.name, "Tessera Fake Dev (test only)")
+        XCTAssertEqual(profile.bundleIdentifierPattern, "dev.tessera.app")
+        XCTAssertEqual(artifact.status, .imported)
+        XCTAssertTrue(artifact.issues.isEmpty, "unexpected findings: \(artifact.issues)")
+    }
+
     func testExpiredProfileAndUnsignedExtensionAreWarningsNotErrors() async throws {
         let artifact = try await service.importArchive(from: fixture("signed-expired-profile.ipa"))
         XCTAssertEqual(artifact.status, .imported)

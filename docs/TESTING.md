@@ -11,16 +11,16 @@ Automated tests (`swift test`, run by CI) cover the core logic and push the samp
 
 ## Tessera inspecting itself
 
-The CI run that builds `Tessera-unsigned.ipa` also publishes an artifact **Tessera-fake-signed-ipas** with two copies of the real Tessera build (made by `scripts/fake_sign_ipa.py`; the executable is untouched):
+The CI run that builds `Tessera-unsigned.ipa` also publishes an artifact **Tessera-fake-signed-ipas** with two copies of the real Tessera build, made by `scripts/fake_sign_ipa.py`. The script fake-signs the main executable with [`ldid`](https://github.com/ProcursusTeam/ldid) (the tool that `fakesigner` wraps), giving it entitlements that match the fake profile, then adds the profile. If `ldid` fails, CI falls back to a minimal built-in fake signature and shows a warning on the run; the job log says which was used.
 
 | File | Expected in the inspector |
 | --- | --- |
 | `Tessera-fake-signed.ipa` | Name *Tessera*, `dev.tessera.app`, 0.1.0 (1), arm64, an embedded profile *Tessera Fake Dev (test only)*: Development, App ID `dev.tessera.app`, 2 devices, expires 2036. No "profile expired" warning. |
 | `Tessera-fake-signed-expired.ipa` | Same build with an embedded *Ad Hoc* profile that expired in 2021: an "embedded profile expired" warning. |
 
-The code-signature row reflects the real binary (the linker normally gives it an ad-hoc signature, so it may read "Present" with no entitlements). Whatever it shows, note it: that is the first look at a real Xcode-built binary, which the hand-made samples below can't tell us. Unlike the samples, there is no icon unless the build has a loose icon file (asset-catalog icons can't be read yet).
+Both should show the code signature as **Present** with 4 entitlements (`application-identifier`, `com.apple.developer.team-identifier`, `get-task-allow`, `keychain-access-groups`). If the signature shows as present but the entitlements list is empty, tell me: it would mean `ldid` wrote them somewhere Tessera doesn't read yet (for example only in the newer DER entitlements slot). Unlike the samples below, there is no icon unless the build has a loose icon file (asset-catalog icons can't be read yet).
 
-These are **not** validly signed and will not install; they exist to exercise the inspector and validation.
+These are **not** validly signed and will not install or run; they exist to exercise the inspector and validation. `TestAssets/tessera-like-fake-signed.ipa` is the same idea built from a realistically laid-out binary with the built-in signer; its import is checked by the Swift tests.
 
 ## Import and inspect
 

@@ -33,7 +33,7 @@ iOS/iPadOS app for managing, inspecting, signing and distributing IPA builds on-
 
 ## No Mac?
 
-You don't need one to build. Every push to `main` runs the `unsigned-ipa` CI job, which uploads `Tessera-unsigned.ipa` as a downloadable artifact (Actions run page, "Artifacts"). The file is **unsigned**: sign and install it with a sideloader you already trust. The same job also publishes `Tessera-fake-signed-ipas`: copies of the real build with a hand-made, *fake* embedded profile (valid and expired variants), purely for testing Tessera's inspector. They will not install. See [`docs/TESTING.md`](docs/TESTING.md).
+You don't need one to build. Every push to `main` runs the `unsigned-ipa` CI job, which uploads `Tessera-unsigned.ipa` as a downloadable artifact (Actions run page, "Artifacts"). The file is **unsigned**: sign and install it with a sideloader you already trust. The same job also publishes `Tessera-fake-signed-ipas`: copies of the real build fake-signed with `ldid` plus a hand-made, *fake* embedded profile (valid and expired variants), purely for testing Tessera's inspector. They will not install or run. See [`docs/TESTING.md`](docs/TESTING.md).
 
 To get signing files for a **paid** developer account without a Mac, generate the certificate request with OpenSSL:
 
