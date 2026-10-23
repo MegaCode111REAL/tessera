@@ -85,6 +85,10 @@ public struct IPAImportService: Sendable {
             )
             await repository.upsert(artifact)
             return artifact
+        } catch ArchiveError.cannotOpen(_) {
+            // Report the user's file name, not the internal name of the stored copy.
+            try? FileManager.default.removeItem(at: storedURL)
+            throw ArchiveError.cannotOpen(name)
         } catch {
             try? FileManager.default.removeItem(at: storedURL)
             throw error
