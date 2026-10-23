@@ -21,9 +21,11 @@ public struct StorageUsage: Equatable, Sendable {
 public enum StoreError: Error, LocalizedError, Equatable {
     case copyFailed(String)
     case notFound(String)
+    case invalidIdentifier(String)
 
     public var errorDescription: String? {
         switch self {
+        case .invalidIdentifier: return "The profile identifier is not valid."
         case .copyFailed(let message): return "Could not copy the file: \(message)"
         case .notFound(let name): return "“\(name)” was not found in Tessera's storage."
         }
@@ -143,21 +145,29 @@ public final class SecureAssetStore: Sendable {
     // MARK: - Provisioning profiles
 
     /// Stores raw profile bytes under the profile's UUID.
+    /// The on-disk location for a profile. Only canonical UUIDs are accepted, so an identifier can
+    /// never contain path separators or `..` and escape the Profiles directory.
+    func profileURL(id: String) throws -> URL {
+        guard UUID(uuidString: id) != nil else { throw StoreError.invalidIdentifier(id) }
+        return profilesDirectory.appendingPathComponent("\(id).mobileprovision")
+    }
+
     public func saveProfile(data: Data, profile: ProvisioningProfile) throws {
-        let url = profilesDirectory.appendingPathComponent("\(profile.id).mobileprovision")
+        let url = try profileURL(id: profile.id)
         try data.write(to: url, options: .atomic)
         Self.excludeFromBackup(url)
         Self.applyProtection(url, sensitive: true)
     }
 
     public func profileData(id: String) throws -> Data {
-        let url = profilesDirectory.appendingPathComponent("\(id).mobileprovision")
+        let url = try profileURL(id: id)
         guard let data = try? Data(contentsOf: url) else { throw StoreError.notFound("\(id).mobileprovision") }
         return data
     }
 
     public func deleteProfile(id: String) {
-        try? FileManager.default.removeItem(at: profilesDirectory.appendingPathComponent("\(id).mobileprovision"))
+        guard let url = try? profileURL(id: id) else { return }
+        try? FileManager.default.removeItem(at: url)
     }
 
     public func listProfiles() -> [ProvisioningProfile] {

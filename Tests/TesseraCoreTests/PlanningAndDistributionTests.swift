@@ -72,6 +72,17 @@ final class ManifestTests: XCTestCase {
         XCTAssertThrowsError(try ManifestBuilder.installURL(manifestURL: URL(string: "http://example.com/m.plist")!))
     }
 
+    func testRequiresAHostName() {
+        // Foundation parses these as https URLs even though there is no host.
+        for text in ["https:/app.ipa", "https:app.ipa"] {
+            guard let url = URL(string: text) else { continue }
+            XCTAssertThrowsError(try ManifestBuilder.makeManifest(ipaURL: url, bundleIdentifier: "x", bundleVersion: "1", title: "t"), text) { error in
+                XCTAssertEqual(error as? DistributionError, .missingHost("The IPA URL"))
+            }
+            XCTAssertThrowsError(try ManifestBuilder.installURL(manifestURL: url), text)
+        }
+    }
+
     func testManifestContents() throws {
         let data = try ManifestBuilder.makeManifest(
             ipaURL: URL(string: "https://example.com/a.ipa")!, bundleIdentifier: "com.example.app", bundleVersion: "7", title: "App")

@@ -100,11 +100,18 @@ public struct ValidationService: Sendable {
         }
 
         // Entitlements
-        let unmatched = metadata.existingEntitlements.keys
-            .filter { !Self.signerManagedEntitlements.contains($0) && profile.entitlements[$0] == nil }
-            .sorted()
-        for key in unmatched {
-            issues.append(.init(code: "ENTITLEMENT_NOT_IN_PROFILE", severity: .warning, message: "The app requests “\(key)”, which the profile does not grant. It must be removed when signing or the build will not install."))
+        for key in metadata.existingEntitlements.keys.sorted() where !Self.signerManagedEntitlements.contains(key) {
+            guard let requested = metadata.existingEntitlements[key] else { continue }
+            guard let granted = profile.entitlements[key] else {
+                issues.append(.init(code: "ENTITLEMENT_NOT_IN_PROFILE", severity: .warning, message: "The app requests “\(key)”, which the profile does not grant. It must be removed when signing or the build will not install."))
+                continue
+            }
+            if !Self.entitlementSatisfied(requested: requested, granted: granted) {
+                issues.append(.init(
+                    code: "ENTITLEMENT_VALUE_MISMATCH", severity: .error,
+                    message: "The app requests “\(key)” = \(requested.displayString), but the profile only grants \(granted.displayString). The signed build would not get the entitlement it needs."
+                ))
+            }
         }
 
         // Device eligibility
@@ -119,6 +126,37 @@ public struct ValidationService: Sendable {
         }
 
         return issues + identityIssues(identity, profile: profile, date: date)
+    }
+
+    /// Whether the value a profile grants covers the value an app requests.
+    /// Handles exact matches, `*` wildcards, trailing-`*` prefix patterns, and list-valued grants.
+    static func entitlementSatisfied(requested: PlistValue, granted: PlistValue) -> Bool {
+        if requested == granted { return true }
+        if case .bool(false) = requested { return true }   // not asking for the capability
+
+        switch (requested, granted) {
+        case (_, .string("*")):
+            return true
+        case (_, .array(let values)) where values.contains(.string("*")):
+            return true
+        case (.string(let value), .string(let pattern)):
+            return matchesPattern(value, pattern)
+        case (.string(let value), .array(let patterns)):
+            return patterns.contains { item in
+                if case .string(let pattern) = item { return matchesPattern(value, pattern) }
+                return false
+            }
+        case (.array(let values), _):
+            return values.allSatisfy { entitlementSatisfied(requested: $0, granted: granted) }
+        default:
+            return false
+        }
+    }
+
+    private static func matchesPattern(_ value: String, _ pattern: String) -> Bool {
+        if value == pattern { return true }
+        if pattern.hasSuffix("*") { return value.hasPrefix(String(pattern.dropLast())) }
+        return false
     }
 
     private func identityIssues(_ identity: SigningIdentityInfo?, profile: ProvisioningProfile?, date: Date) -> [ValidationIssue] {

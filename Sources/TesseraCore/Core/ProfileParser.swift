@@ -4,9 +4,11 @@ public enum ProfileParserError: Error, LocalizedError, Equatable {
     case notAProfile
     case malformedPlist
     case missingField(String)
+    case invalidIdentifier
 
     public var errorDescription: String? {
         switch self {
+        case .invalidIdentifier: return "The provisioning profile's UUID is not a valid identifier."
         case .notAProfile: return "The file is not a provisioning profile."
         case .malformedPlist: return "The provisioning profile's property list could not be read."
         case .missingField(let name): return "The provisioning profile is missing “\(name)”."
@@ -27,6 +29,8 @@ public struct ProfileParser: Sendable {
         }
 
         guard let uuid = dict["UUID"] as? String else { throw ProfileParserError.missingField("UUID") }
+        // The UUID becomes a file name in protected storage, so only a canonical UUID is accepted.
+        guard UUID(uuidString: uuid) != nil else { throw ProfileParserError.invalidIdentifier }
         guard let name = dict["Name"] as? String else { throw ProfileParserError.missingField("Name") }
         guard let expiration = dict["ExpirationDate"] as? Date else { throw ProfileParserError.missingField("ExpirationDate") }
         guard let entitlementsDict = dict["Entitlements"] as? [String: Any] else { throw ProfileParserError.missingField("Entitlements") }

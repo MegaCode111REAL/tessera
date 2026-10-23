@@ -50,7 +50,9 @@ enum Fixtures {
         )
     }
 
-    static func profilePlist(uuid: String = "UUID-1", name: String = "Sample", expires: Date? = nil) -> Data {
+    static let sampleUUID = "11111111-2222-3333-4444-555555555555"
+
+    static func profilePlist(uuid: String = sampleUUID, name: String = "Sample", expires: Date? = nil) -> Data {
         let dict: [String: Any] = [
             "UUID": uuid, "Name": name, "TeamName": "Team", "TeamIdentifier": ["TEAM123456"],
             "ApplicationIdentifierPrefix": ["TEAM123456"],
@@ -70,7 +72,7 @@ enum Fixtures {
 final class ProfileParserTests: XCTestCase {
     func testParsesProfileInsideEnvelope() throws {
         let profile = try ProfileParser().parse(Fixtures.profilePlist())
-        XCTAssertEqual(profile.id, "UUID-1")
+        XCTAssertEqual(profile.id, Fixtures.sampleUUID)
         XCTAssertEqual(profile.teamIdentifier, "TEAM123456")
         XCTAssertEqual(profile.bundleIdentifierPattern, "com.example.*")
         XCTAssertEqual(profile.provisionedDevices?.count, 2)
@@ -81,6 +83,14 @@ final class ProfileParserTests: XCTestCase {
     func testRejectsGarbage() {
         XCTAssertThrowsError(try ProfileParser().parse(Data("hello".utf8))) { error in
             XCTAssertEqual(error as? ProfileParserError, .notAProfile)
+        }
+    }
+
+    func testRejectsNonUUIDIdentifiers() {
+        for bad in ["../Exports/evil", "UUID-1", "a/b", "", "..", "11111111-2222-3333-4444-555555555555/../x"] {
+            XCTAssertThrowsError(try ProfileParser().parse(Fixtures.profilePlist(uuid: bad)), "should reject \(bad)") { error in
+                XCTAssertEqual(error as? ProfileParserError, .invalidIdentifier)
+            }
         }
     }
 
@@ -159,6 +169,35 @@ final class ValidationServiceTests: XCTestCase {
             profile: Fixtures.profile(), identity: Fixtures.identity()
         )
         XCTAssertTrue(codes(issues).contains("ENTITLEMENT_NOT_IN_PROFILE"))
+    }
+
+    func testEntitlementValueMismatchIsBlocking() {
+        let metadata = Fixtures.metadata(entitlements: ["aps-environment": .string("production")])
+        let dev = Fixtures.profile(extra: ["aps-environment": .string("development")])
+        let issues = service.validateForSigning(metadata: metadata, profile: dev, identity: Fixtures.identity())
+        XCTAssertTrue(issues.contains { $0.code == "ENTITLEMENT_VALUE_MISMATCH" && $0.severity == .error })
+
+        let prod = Fixtures.profile(extra: ["aps-environment": .string("production")])
+        let ok = service.validateForSigning(metadata: metadata, profile: prod, identity: Fixtures.identity())
+        XCTAssertFalse(codes(ok).contains("ENTITLEMENT_VALUE_MISMATCH"))
+    }
+
+    func testEntitlementSatisfiedRules() {
+        typealias V = PlistValue
+        let check = ValidationService.entitlementSatisfied
+        XCTAssertTrue(check(V.bool(true), V.bool(true)))
+        XCTAssertFalse(check(V.bool(true), V.bool(false)))
+        XCTAssertTrue(check(V.bool(false), V.bool(false)))
+        XCTAssertTrue(check(V.string("anything"), V.string("*")))
+        XCTAssertTrue(check(V.string("group.com.example.a"), V.string("group.com.example.*")))
+        XCTAssertFalse(check(V.string("group.com.other.a"), V.string("group.com.example.*")))
+        // Lists: every requested item must be granted.
+        XCTAssertTrue(check(V.array([.string("a"), .string("b")]), V.array([.string("a"), .string("b"), .string("c")])))
+        XCTAssertFalse(check(V.array([.string("a"), .string("z")]), V.array([.string("a"), .string("b")])))
+        XCTAssertTrue(check(V.array([.string("a"), .string("z")]), V.array([.string("*")])))
+        XCTAssertTrue(check(V.string("a"), V.array([.string("a"), .string("b")])))
+        XCTAssertFalse(check(V.string("a"), V.array([.string("b")])))
+        XCTAssertFalse(check(V.string("a"), V.bool(true)))
     }
 
     func testExtensionNeedsCoveredBundleID() {

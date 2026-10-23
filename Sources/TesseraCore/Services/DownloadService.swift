@@ -48,6 +48,7 @@ public struct DownloadService: Sendable {
         progress: (@Sendable (Double) -> Void)? = nil
     ) async throws -> URL {
         guard url.scheme?.lowercased() == "https" else { throw DownloadError.httpsRequired }
+        guard let host = url.host, !host.isEmpty else { throw DownloadError.failed("The address has no host name.") }
 
         let destination = directory.appendingPathComponent(Self.fileName(for: url))
         let delegate = DownloadDelegate(destination: destination, maxBytes: maxBytes, progress: progress)

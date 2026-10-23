@@ -3,9 +3,11 @@ import Foundation
 public enum DistributionError: Error, LocalizedError, Equatable {
     case httpsRequired(String)
     case invalidURL(String)
+    case missingHost(String)
 
     public var errorDescription: String? {
         switch self {
+        case .missingHost(let what): return "\(what) needs a host name, for example https://example.com/app.ipa."
         case .httpsRequired(let what): return "\(what) must use HTTPS. iOS refuses over-the-air installs from plain HTTP."
         case .invalidURL(let what): return "“\(what)” is not a valid URL."
         }
@@ -14,11 +16,16 @@ public enum DistributionError: Error, LocalizedError, Equatable {
 
 /// Builds `itms-services` manifests. Only used when the chosen mechanism needs one.
 public enum ManifestBuilder {
+    /// Foundation accepts `https:app.ipa` and `https:/app.ipa` as HTTPS URLs even though they have
+    /// no host, so both the scheme and a non-empty host are checked.
+    static func requireHostedHTTPS(_ url: URL, _ what: String) throws {
+        guard url.scheme?.lowercased() == "https" else { throw DistributionError.httpsRequired(what) }
+        guard let host = url.host, !host.isEmpty else { throw DistributionError.missingHost(what) }
+    }
+
     /// Creates the manifest property list for an HTTPS-hosted IPA.
     public static func makeManifest(ipaURL: URL, bundleIdentifier: String, bundleVersion: String, title: String) throws -> Data {
-        guard ipaURL.scheme?.lowercased() == "https" else {
-            throw DistributionError.httpsRequired("The IPA URL")
-        }
+        try requireHostedHTTPS(ipaURL, "The IPA URL")
         let manifest: [String: Any] = [
             "items": [[
                 "assets": [[
@@ -38,9 +45,7 @@ public enum ManifestBuilder {
 
     /// The URL that asks iOS to install from `manifestURL`.
     public static func installURL(manifestURL: URL) throws -> URL {
-        guard manifestURL.scheme?.lowercased() == "https" else {
-            throw DistributionError.httpsRequired("The manifest URL")
-        }
+        try requireHostedHTTPS(manifestURL, "The manifest URL")
         var components = URLComponents()
         components.scheme = "itms-services"
         components.host = ""
