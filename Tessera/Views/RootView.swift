@@ -31,6 +31,7 @@ struct RootView: View {
                 .tabItem { Label(AppTab.settings.title, systemImage: AppTab.settings.systemImage) }
                 .tag(AppTab.settings)
         }
+        .tint(Theme.tileColors[1])
         .overlay {
             if state.isBusy {
                 ZStack {

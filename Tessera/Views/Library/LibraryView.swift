@@ -43,7 +43,10 @@ struct LibraryView: View {
             Group {
                 if state.artifacts.isEmpty {
                     ContentUnavailableView {
-                        Label("No builds yet", systemImage: "square.stack.3d.up")
+                        VStack(spacing: 12) {
+                            MosaicLogo(size: 84)
+                            Text("No builds yet").font(.title2.bold())
+                        }
                     } description: {
                         Text("Import an .ipa from the Files app to inspect it. Everything stays on this device.")
                     } actions: {
