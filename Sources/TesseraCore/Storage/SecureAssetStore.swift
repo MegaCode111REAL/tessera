@@ -7,6 +7,14 @@ public struct StorageUsage: Equatable, Sendable {
     public var icons: UInt64
     public var temporary: UInt64
 
+    public init(library: UInt64 = 0, exports: UInt64 = 0, profiles: UInt64 = 0, icons: UInt64 = 0, temporary: UInt64 = 0) {
+        self.library = library
+        self.exports = exports
+        self.profiles = profiles
+        self.icons = icons
+        self.temporary = temporary
+    }
+
     public var total: UInt64 { library + exports + profiles + icons + temporary }
 }
 

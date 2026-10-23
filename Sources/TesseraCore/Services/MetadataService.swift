@@ -3,6 +3,11 @@ import Foundation
 public struct InspectionResult: Sendable {
     public var metadata: AppMetadata
     public var iconData: Data?
+
+    public init(metadata: AppMetadata, iconData: Data? = nil) {
+        self.metadata = metadata
+        self.iconData = iconData
+    }
 }
 
 /// Extracts app metadata from an archive. The archive is unpacked into a temporary workspace
