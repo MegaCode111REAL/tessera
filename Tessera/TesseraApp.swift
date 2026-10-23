@@ -25,6 +25,14 @@ struct TesseraApp: App {
                     .environment(appState)
                     .environment(router)
                     .task { await appState.reload() }
+                    // Files shared to Tessera and tessera:// links both arrive here.
+                    .onOpenURL { url in
+                        Task {
+                            if let id = await appState.handleIncoming(url) {
+                                router.showArtifact(id)
+                            }
+                        }
+                    }
             } else {
                 ContentUnavailableView(
                     "Tessera couldn't start",

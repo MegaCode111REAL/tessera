@@ -46,3 +46,27 @@ targets:
           UIApplicationSupportsMultipleScenes: false
         LSSupportsOpeningDocumentsInPlace: true
         UIFileSharingEnabled: false
+        # tessera://install?url=https://… downloads an IPA into the library (after confirmation).
+        CFBundleURLTypes:
+          - CFBundleURLName: dev.tessera.app
+            CFBundleTypeRole: Viewer
+            CFBundleURLSchemes:
+              - tessera
+        # Lets Tessera appear in the share sheet / "Open in…" for .ipa files.
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: iOS App Archive
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - com.apple.itunes.ipa
+        UTImportedTypeDeclarations:
+          - UTTypeIdentifier: com.apple.itunes.ipa
+            UTTypeDescription: iOS App Archive
+            UTTypeConformsTo:
+              - public.data
+              - public.archive
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - ipa
+              public.mime-type:
+                - application/octet-stream

@@ -12,6 +12,7 @@ final class AppDependencies {
     let export: ExportService
     let distribution: DistributionService
     let installation: InstallationService
+    let downloads: DownloadService
 
     init(
         store: SecureAssetStore,
@@ -22,7 +23,8 @@ final class AppDependencies {
         coordinator: SigningCoordinator,
         export: ExportService,
         distribution: DistributionService,
-        installation: InstallationService
+        installation: InstallationService,
+        downloads: DownloadService
     ) {
         self.store = store
         self.repository = repository
@@ -33,6 +35,7 @@ final class AppDependencies {
         self.export = export
         self.distribution = distribution
         self.installation = installation
+        self.downloads = downloads
     }
 
     static func make() throws -> AppDependencies {
@@ -64,7 +67,8 @@ final class AppDependencies {
             coordinator: coordinator,
             export: ExportService(store: store),
             distribution: DistributionService(),
-            installation: InstallationService()
+            installation: InstallationService(),
+            downloads: DownloadService()
         )
     }
 }

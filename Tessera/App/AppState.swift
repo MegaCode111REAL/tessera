@@ -24,6 +24,8 @@ final class AppState {
     var busyMessage = ""
     var alert: AppAlert?
     var runningJob: SigningJob?
+    /// A download link waiting for the user's confirmation.
+    var pendingDownload: URL?
     /// Local diagnostics. Never contains key material, passwords or file contents.
     var diagnostics: [String] = []
 
@@ -58,16 +60,20 @@ final class AppState {
 
     // MARK: - Library
 
-    func importArchives(_ urls: [URL]) async {
-        guard !urls.isEmpty else { return }
+    /// Imports each file and returns the IDs of the builds that were added.
+    @discardableResult
+    func importArchives(_ urls: [URL]) async -> [UUID] {
+        guard !urls.isEmpty else { return [] }
         isBusy = true
         defer { isBusy = false; busyMessage = "" }
 
+        var imported: [UUID] = []
         var failures: [String] = []
         for url in urls {
             busyMessage = "Importing \(url.lastPathComponent)…"
             do {
                 let artifact = try await dependencies.importService.importArchive(from: url)
+                imported.append(artifact.id)
                 log("Imported \(artifact.metadata.bundleIdentifier) \(artifact.metadata.versionDescription)")
             } catch {
                 failures.append("\(url.lastPathComponent): \(error.localizedDescription)")
@@ -78,6 +84,72 @@ final class AppState {
         if !failures.isEmpty {
             alert = AppAlert(title: failures.count == 1 ? "Couldn't import file" : "Couldn't import \(failures.count) files",
                              message: failures.joined(separator: "\n\n"))
+        }
+        return imported
+    }
+
+    // MARK: - Incoming URLs (share sheet, Open in…, tessera://)
+
+    /// Handles a URL the system handed to the app. Files import immediately. Download links are
+    /// held in `pendingDownload` until the user confirms, because any web page can trigger a
+    /// custom-scheme link. Returns the imported build's ID when a file was imported.
+    func handleIncoming(_ url: URL) async -> UUID? {
+        switch IncomingLinkParser.parse(url) {
+        case .importFile(let fileURL):
+            log("Received file \(fileURL.lastPathComponent)")
+            return await importArchives([fileURL]).first
+        case .download(let remote):
+            log("Received download link for \(remote.host ?? "unknown host")")
+            pendingDownload = remote
+            return nil
+        case .invalid(let reason):
+            log("Ignored link: \(reason)")
+            alert = AppAlert(title: "Can't open link", message: reason)
+            return nil
+        }
+    }
+
+    func cancelPendingDownload() {
+        pendingDownload = nil
+    }
+
+    /// Downloads the confirmed link into a temporary workspace, imports it, and cleans up.
+    /// Returns the imported build's ID on success.
+    func confirmPendingDownload() async -> UUID? {
+        guard let remote = pendingDownload else { return nil }
+        pendingDownload = nil
+
+        isBusy = true
+        busyMessage = "Downloading from \(remote.host ?? "server")…"
+        defer { isBusy = false; busyMessage = "" }
+
+        let store = dependencies.store
+        let workspace: URL
+        do {
+            workspace = try store.makeWorkspace()
+        } catch {
+            alert = AppAlert(title: "Couldn't start download", message: error.localizedDescription)
+            return nil
+        }
+        defer { store.removeWorkspace(workspace) }
+
+        do {
+            let file = try await dependencies.downloads.download(remote, into: workspace) { [weak self] fraction in
+                Task { @MainActor in
+                    self?.busyMessage = "Downloading… \(Int(fraction * 100))%"
+                }
+            }
+            busyMessage = "Importing…"
+            let artifact = try await dependencies.importService.importArchive(from: file)
+            log("Downloaded and imported \(artifact.metadata.bundleIdentifier) from \(remote.host ?? "server")")
+            await reload()
+            return artifact.id
+        } catch is CancellationError {
+            return nil
+        } catch {
+            log("Download failed: \(error.localizedDescription)")
+            alert = AppAlert(title: "Couldn't download IPA", message: error.localizedDescription)
+            return nil
         }
     }
 

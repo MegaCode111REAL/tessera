@@ -18,6 +18,8 @@ iOS/iPadOS app for managing, inspecting, signing and distributing IPA builds on-
 | Signing wizard UI, signing order planner | Implemented |
 | **On-device code signing** | **Not implemented** (reports "unsupported", produces no output) |
 | Export original IPA, validation reports (Markdown/JSON), over-the-air manifest builder | Implemented |
+| Share an `.ipa` to Tessera (share sheet, "Open in…", AirDrop, Files) | Implemented |
+| `tessera://install?url=<https URL>` link: confirms, downloads the IPA into the library, opens the inspector | Implemented + tested |
 | Distribution eligibility (never promises installability; notarization is never fabricated) | Implemented + tested |
 | `.tipa` | Architecture ready (`FormatAdapter`); disabled |
 | Apple notarization submission | Not implemented |
@@ -55,7 +57,15 @@ GitHub Actions (`.github/workflows/ci.yml`) runs `swift test` and a simulator bu
 - Tessera never asks for an Apple Account password.
 - Imported files live in the app container, excluded from backups; profiles use complete file protection.
 - Provisioning profiles are parsed but Apple's CMS signature on them is **not yet verified**.
-- Tessera makes no network requests of its own.
+- The only network code is `DownloadService`, used for `tessera://install` links. It runs only after the user confirms the exact URL, accepts HTTPS only (no embedded credentials, no redirects to HTTP), sends no cookies, and enforces a size limit.
+
+## Install links
+
+```
+tessera://install?url=https%3A%2F%2Fexample.com%2Fapp.ipa
+```
+
+"Install" here means *download into Tessera's library and inspect*. iOS doesn't allow an ordinary app to install arbitrary IPAs, so Tessera never claims otherwise. `tessera://import?url=…` behaves the same. Files shared to the app go straight to the importer.
 
 ## Next steps
 

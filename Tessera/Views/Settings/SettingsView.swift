@@ -42,7 +42,17 @@ struct SettingsView: View {
                 } header: {
                     Text("Privacy and Security")
                 } footer: {
-                    Text("Tessera makes no network requests of its own. If you open an over-the-air install link, iOS contacts the HTTPS server you specified.")
+                    Text("Tessera uses the network only when you confirm a tessera://install link, and then only to download that one HTTPS file. If you open an over-the-air install link, iOS contacts the HTTPS server you specified.")
+                }
+
+                Section {
+                    Text("tessera://install?url=https%3A%2F%2Fexample.com%2Fapp.ipa")
+                        .font(.caption.monospaced())
+                        .textSelection(.enabled)
+                } header: {
+                    Text("Install Links")
+                } footer: {
+                    Text("Opening this kind of link asks for confirmation, then downloads the IPA into your library for inspection. iOS doesn't let apps install arbitrary IPAs, so this does not install it. You can also share an .ipa file to Tessera from Files, AirDrop or any share sheet.")
                 }
 
                 Section("About") {

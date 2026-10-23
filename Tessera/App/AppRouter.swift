@@ -44,6 +44,12 @@ final class AppRouter {
     /// Build pre-selected when jumping to Signing or Distribution from elsewhere.
     var focusedArtifactID: UUID?
 
+    /// Jumps to a build's inspector in the Library tab.
+    func showArtifact(_ id: UUID) {
+        selectedTab = .library
+        libraryPath = [id]
+    }
+
     func showSigning(for artifactID: UUID) {
         focusedArtifactID = artifactID
         selectedTab = .signing

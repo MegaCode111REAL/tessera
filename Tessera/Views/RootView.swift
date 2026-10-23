@@ -4,6 +4,11 @@ struct RootView: View {
     @Environment(AppState.self) private var state
     @Environment(AppRouter.self) private var router
 
+    private var downloadPrompt: String {
+        guard let url = state.pendingDownload else { return "" }
+        return "A link is asking Tessera to download a file from \(url.host ?? "an unknown server"):\n\n\(url.absoluteString)\n\nOnly continue if you trust this site. The file is added to your library and is not installed or run."
+    }
+
     var body: some View {
         @Bindable var state = state
         @Bindable var router = router
@@ -47,6 +52,25 @@ struct RootView: View {
         }
         .alert(item: $state.alert) { alert in
             Alert(title: Text(alert.title), message: Text(alert.message), dismissButton: .default(Text("OK")))
+        }
+        .confirmationDialog(
+            "Download this IPA?",
+            isPresented: Binding(
+                get: { state.pendingDownload != nil },
+                set: { if !$0 { state.cancelPendingDownload() } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Download and Import") {
+                Task {
+                    if let id = await state.confirmPendingDownload() {
+                        router.showArtifact(id)
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) { state.cancelPendingDownload() }
+        } message: {
+            Text(downloadPrompt)
         }
     }
 }
