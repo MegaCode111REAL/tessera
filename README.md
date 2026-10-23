@@ -31,9 +31,25 @@ iOS/iPadOS app for managing, inspecting, signing and distributing IPA builds on-
 - `Tests/TesseraCoreTests`: unit tests for the core logic.
 - `project.yml`: [XcodeGen](https://github.com/yonaskolb/XcodeGen) spec for the app target.
 
+## No Mac?
+
+You don't need one to build. Every push to `main` runs the `unsigned-ipa` CI job, which uploads `Tessera-unsigned.ipa` as a downloadable artifact (Actions run page, "Artifacts"). The file is **unsigned**: sign and install it with a sideloader you already trust.
+
+To get signing files for a **paid** developer account without a Mac, generate the certificate request with OpenSSL:
+
+```sh
+openssl req -new -newkey rsa:2048 -nodes -keyout dev.key -out dev.csr \
+  -subj "/CN=Your Name/emailAddress=you@example.com"
+# Upload dev.csr in the developer portal (Certificates > Apple Development), download the .cer, then:
+openssl x509 -inform DER -in dev.cer -out dev.pem
+openssl pkcs12 -export -inkey dev.key -in dev.pem -out dev.p12
+```
+
+Then create a profile in the portal (it needs your device's UDID) and import the `.p12` and `.mobileprovision` in Tessera. OpenSSL 3 writes `.p12` files with newer encryption that some iOS versions reject; if import reports a wrong password for a correct one, add `-legacy` (or `-certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg sha1`) to the `pkcs12` command. Free Apple IDs have no portal access, so they can't use this route.
+
 ## Build
 
-Requires Xcode 16+ on macOS (a Mac VM works).
+Requires Xcode 16+ on macOS (or just use the CI artifact above).
 
 ```sh
 brew install xcodegen

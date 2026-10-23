@@ -31,3 +31,36 @@ jobs:
             -scheme Tessera \
             -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO
+
+  # Produces an UNSIGNED device build you can download from the run's "Artifacts" section and
+  # sign/install with a sideloader of your choice. It will not install as-is.
+  unsigned-ipa:
+    name: Build unsigned IPA
+    runs-on: macos-15
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate project
+        run: xcodegen generate
+      - name: Archive without signing
+        run: |
+          xcodebuild archive \
+            -project Tessera.xcodeproj \
+            -scheme Tessera \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/Tessera.xcarchive \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+      - name: Package IPA
+        run: |
+          mkdir -p ipa/Payload
+          cp -R build/Tessera.xcarchive/Products/Applications/Tessera.app ipa/Payload/
+          (cd ipa && zip -qry ../Tessera-unsigned.ipa Payload)
+          ls -lh Tessera-unsigned.ipa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Tessera-unsigned-ipa
+          path: Tessera-unsigned.ipa
+          retention-days: 30
