@@ -16,6 +16,8 @@ Import each file from the Library tab (+). Expected results:
 | File | Expected |
 | --- | --- |
 | `valid-sample.ipa` | Imports as **Imported**. Name *TesseraSample*, `com.example.tesserasample`, 1.0 (1), arm64, iPhone and iPad, a blue icon, 1 extension, 1 framework, signature "None". One info note: no code signature. |
+| `signed-sample.ipa` | Imports as **Imported** with **no findings**. Signature "Present", embedded profile *Tessera Sample Dev* (Development, team TEAM123456, App ID `com.example.signedsample`, 2 devices, 1 certificate, expires 2036), 5 entitlements listed, extension and framework both shown signed, orange icon. |
+| `signed-expired-profile.ipa` | Imports as **Imported** with two warnings: embedded profile expired (2021) and 1 nested component unsigned. Profile type Ad Hoc, 1 device. |
 | `encrypted.ipa` | Imports as **Needs Attention** with an error that the executable is encrypted. |
 | `simulator.ipa` | Imports as **Needs Attention** with an error that it is a simulator build. |
 | `no-payload.ipa` | Alert: the archive has no Payload folder. Nothing added to the Library. |
@@ -25,6 +27,10 @@ Import each file from the Library tab (+). Expected results:
 | `not-a-zip.ipa` | Alert: "not-a-zip.ipa" is not a readable archive. Nothing added. |
 
 After the failures, Settings > Storage should show **0 bytes** of temporary files.
+
+The two `signed-*` samples are **fake**: they contain a signature-shaped blob carrying entitlements, a hand-built profile, and no real CodeDirectory or CMS signature. They exist to exercise the inspector and validation, and they will not install anywhere. Tessera currently detects that a signature is *present* and reads its entitlements; it does not cryptographically verify signatures.
+
+To try the signing checks with them, import a `.p12` and the matching profile: with these samples the certificate will not be in the embedded profile, so "certificate not in profile" is the expected blocking result.
 
 ## Share to Tessera
 

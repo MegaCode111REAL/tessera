@@ -113,4 +113,55 @@ final class ImportFixturesTests: XCTestCase {
     func testNonZipReportsTheUsersFileName() async {
         await assertCleanFailure("not-a-zip.ipa") { ($0 as? ArchiveError) == .cannotOpen("not-a-zip.ipa") }
     }
+
+    // MARK: - Fake signed builds
+
+    func testSignedSampleShowsSignatureEntitlementsAndProfile() async throws {
+        let artifact = try await service.importArchive(from: fixture("signed-sample.ipa"))
+        let metadata = artifact.metadata
+        XCTAssertTrue(metadata.hasCodeSignature)
+        XCTAssertTrue(metadata.hasEmbeddedProfile)
+        XCTAssertEqual(metadata.existingEntitlements["aps-environment"], .string("development"))
+        XCTAssertEqual(metadata.existingEntitlements["get-task-allow"], .bool(true))
+        XCTAssertEqual(metadata.existingEntitlements["application-identifier"], .string("TEAM123456.com.example.signedsample"))
+
+        let profile = try XCTUnwrap(metadata.embeddedProfile)
+        XCTAssertEqual(profile.name, "Tessera Sample Dev")
+        XCTAssertEqual(profile.id, "AAAAAAAA-1111-2222-3333-444444444444")
+        XCTAssertEqual(profile.kind, .development)
+        XCTAssertEqual(profile.teamIdentifier, "TEAM123456")
+        XCTAssertEqual(profile.bundleIdentifierPattern, "com.example.signedsample")
+        XCTAssertEqual(profile.provisionedDevices?.count, 2)
+        XCTAssertEqual(profile.developerCertificateSHA1s.count, 1)
+        XCTAssertFalse(profile.isExpired())
+
+        XCTAssertTrue(metadata.nestedBundles.allSatisfy(\.hasCodeSignature))
+        XCTAssertEqual(artifact.status, .imported)
+        XCTAssertTrue(artifact.issues.isEmpty, "unexpected findings: \(artifact.issues)")
+    }
+
+    func testSignedSampleValidatesCleanlyAgainstItsOwnProfileAndCertificate() async throws {
+        let artifact = try await service.importArchive(from: fixture("signed-sample.ipa"))
+        let profile = try XCTUnwrap(artifact.metadata.embeddedProfile)
+        let identity = Fixtures.identity(id: profile.developerCertificateSHA1s[0])
+        let issues = ValidationService(now: { Fixtures.now })
+            .validateForSigning(metadata: artifact.metadata, profile: profile, identity: identity)
+        XCTAssertTrue(issues.filter { $0.severity == .error }.isEmpty, "\(issues)")
+    }
+
+    func testExpiredProfileAndUnsignedExtensionAreWarningsNotErrors() async throws {
+        let artifact = try await service.importArchive(from: fixture("signed-expired-profile.ipa"))
+        XCTAssertEqual(artifact.status, .imported)
+        XCTAssertTrue(codes(artifact).isSuperset(of: ["EMBEDDED_PROFILE_EXPIRED", "NESTED_UNSIGNED"]), "\(artifact.issues)")
+        XCTAssertTrue(artifact.issues.filter { $0.severity == .error }.isEmpty)
+
+        let profile = try XCTUnwrap(artifact.metadata.embeddedProfile)
+        XCTAssertEqual(profile.kind, .adHoc)
+        XCTAssertTrue(profile.isExpired())
+
+        // Trying to sign with that profile is blocked.
+        let blocked = ValidationService().validateForSigning(
+            metadata: artifact.metadata, profile: profile, identity: Fixtures.identity(id: profile.developerCertificateSHA1s[0]))
+        XCTAssertTrue(blocked.contains { $0.code == "PROFILE_EXPIRED" && $0.severity == .error })
+    }
 }
