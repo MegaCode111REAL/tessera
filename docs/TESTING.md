@@ -9,6 +9,19 @@ Automated tests (`swift test`, run by CI) cover the core logic and push the samp
 
 `scripts/make_test_ipas.py` regenerates the samples. None of them are real apps.
 
+## Tessera inspecting itself
+
+The CI run that builds `Tessera-unsigned.ipa` also publishes an artifact **Tessera-fake-signed-ipas** with two copies of the real Tessera build (made by `scripts/fake_sign_ipa.py`; the executable is untouched):
+
+| File | Expected in the inspector |
+| --- | --- |
+| `Tessera-fake-signed.ipa` | Name *Tessera*, `dev.tessera.app`, 0.1.0 (1), arm64, an embedded profile *Tessera Fake Dev (test only)*: Development, App ID `dev.tessera.app`, 2 devices, expires 2036. No "profile expired" warning. |
+| `Tessera-fake-signed-expired.ipa` | Same build with an embedded *Ad Hoc* profile that expired in 2021: an "embedded profile expired" warning. |
+
+The code-signature row reflects the real binary (the linker normally gives it an ad-hoc signature, so it may read "Present" with no entitlements). Whatever it shows, note it: that is the first look at a real Xcode-built binary, which the hand-made samples below can't tell us. Unlike the samples, there is no icon unless the build has a loose icon file (asset-catalog icons can't be read yet).
+
+These are **not** validly signed and will not install; they exist to exercise the inspector and validation.
+
 ## Import and inspect
 
 Import each file from the Library tab (+). Expected results:

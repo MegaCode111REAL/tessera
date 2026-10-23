@@ -64,3 +64,17 @@ jobs:
           name: Tessera-unsigned-ipa
           path: Tessera-unsigned.ipa
           retention-days: 30
+      # Fake-signed copies of the REAL Tessera build, for testing Tessera's inspector on itself.
+      # They add a hand-built profile and a signature stub; they are not validly signed and will
+      # not install. See scripts/fake_sign_ipa.py.
+      - name: Make fake-signed variants
+        run: |
+          python3 scripts/fake_sign_ipa.py Tessera-unsigned.ipa Tessera-fake-signed.ipa
+          python3 scripts/fake_sign_ipa.py Tessera-unsigned.ipa Tessera-fake-signed-expired.ipa --expired
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Tessera-fake-signed-ipas
+          path: |
+            Tessera-fake-signed.ipa
+            Tessera-fake-signed-expired.ipa
+          retention-days: 30
