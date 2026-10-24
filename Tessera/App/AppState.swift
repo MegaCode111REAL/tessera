@@ -235,13 +235,15 @@ final class AppState {
         artifact: AppArtifact,
         identityID: String?,
         profile: ProvisioningProfile?,
-        targetBundleIdentifier: String?
+        targetBundleIdentifier: String?,
+        adHoc: Bool = false
     ) async -> SigningJob {
         let request = SigningCoordinator.Request(
             artifact: artifact,
             identityID: identityID,
             profile: profile,
-            targetBundleIdentifier: targetBundleIdentifier?.isEmpty == true ? nil : targetBundleIdentifier
+            targetBundleIdentifier: targetBundleIdentifier?.isEmpty == true ? nil : targetBundleIdentifier,
+            adHoc: adHoc
         )
         log("Started signing job for \(artifact.metadata.bundleIdentifier)")
         let job = await dependencies.coordinator.run(request) { [weak self] update in

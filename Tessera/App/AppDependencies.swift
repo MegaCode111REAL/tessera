@@ -1,4 +1,6 @@
 import Foundation
+import Foundation
+import Security
 import TesseraCore
 
 /// Composition root: builds the services once and shares them with `AppState`.
@@ -50,9 +52,12 @@ final class AppDependencies {
         let importService = IPAImportService(
             store: store, metadataService: metadata, validation: validation, repository: repository
         )
-        // The signing engine stays "unavailable" until a real implementation has been verified on-device.
+        let signer = BundleSigner { identityID in
+            guard let identity = certificates.identity(withID: identityID) else { throw SigningError.identityUnavailable }
+            return try SecKeySigningKey(identity: identity)
+        }
         let coordinator = SigningCoordinator(
-            engine: UnavailableSigningEngine(),
+            engine: signer,
             validation: validation,
             certificates: certificates,
             store: store,

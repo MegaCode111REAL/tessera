@@ -41,8 +41,12 @@ public actor SigningCoordinator {
         public var profile: ProvisioningProfile?
         public var targetBundleIdentifier: String?
         public var deviceIdentifier: String?
+        /// Ad-hoc ("fakesign") signing: no certificate or profile, entitlements kept as they are.
+        /// The result installs only on devices that skip signature checks.
+        public var adHoc: Bool
 
-        public init(artifact: AppArtifact, identityID: String?, profile: ProvisioningProfile?, targetBundleIdentifier: String? = nil, deviceIdentifier: String? = nil) {
+        public init(artifact: AppArtifact, identityID: String?, profile: ProvisioningProfile?, targetBundleIdentifier: String? = nil, deviceIdentifier: String? = nil, adHoc: Bool = false) {
+            self.adHoc = adHoc
             self.artifact = artifact
             self.identityID = identityID
             self.profile = profile
@@ -71,13 +75,22 @@ public actor SigningCoordinator {
 
         // 1. Validate
         let identity = request.identityID.flatMap { id in certificates.listIdentities().first { $0.id == id } }
-        let issues = validation.validateForSigning(
-            metadata: request.artifact.metadata,
-            profile: request.profile,
-            identity: identity,
-            targetBundleIdentifier: request.targetBundleIdentifier,
-            deviceIdentifier: request.deviceIdentifier
-        )
+        var issues: [ValidationIssue]
+        if request.adHoc {
+            issues = []
+            if request.artifact.metadata.isEncrypted {
+                issues.append(.init(code: "ENCRYPTED", severity: .error, message: "The executable is FairPlay-encrypted and cannot be re-signed."))
+            }
+            issues.append(.init(code: "ADHOC", severity: .warning, message: "Ad-hoc signed builds carry no certificate or profile. Stock iOS will refuse to install or run them; they are for devices that skip signature checks."))
+        } else {
+            issues = validation.validateForSigning(
+                metadata: request.artifact.metadata,
+                profile: request.profile,
+                identity: identity,
+                targetBundleIdentifier: request.targetBundleIdentifier,
+                deviceIdentifier: request.deviceIdentifier
+            )
+        }
         job.issues = issues
         let errors = issues.filter { $0.severity == .error }
         if !errors.isEmpty {
@@ -93,7 +106,7 @@ public actor SigningCoordinator {
             return await finish(&job, state: .unsupported, reason: reason, artifact: request.artifact, status: .validated, onUpdate: onUpdate)
         }
 
-        guard let profile = request.profile, let identityID = request.identityID else {
+        if !request.adHoc, request.profile == nil || request.identityID == nil {
             return await finish(&job, state: .failed, reason: "A profile and identity are required.", artifact: request.artifact, status: .needsAttention, onUpdate: onUpdate)
         }
 
@@ -113,16 +126,18 @@ public actor SigningCoordinator {
             try Task.checkCancellation()
 
             let appBundle = try inspector.locateAppBundle(in: workspace)
-            let profileData = try store.profileData(id: profile.id)
-            try profileData.write(to: appBundle.appendingPathComponent("embedded.mobileprovision"), options: .atomic)
+            var profileData: Data?
+            if !request.adHoc, let profile = request.profile {
+                profileData = try store.profileData(id: profile.id)
+            }
 
             await publish("Signing", progress: 0.5)
-            let signingRequest = SigningRequest(appBundle: appBundle, plan: plan, identityID: identityID, profile: profile, profileData: profileData)
+            let signingRequest = SigningRequest(appBundle: appBundle, plan: plan, identityID: request.adHoc ? nil : request.identityID, profile: request.adHoc ? nil : request.profile, profileData: profileData)
             try await engine.sign(signingRequest) { _ in }
             try Task.checkCancellation()
 
             await publish("Verifying signatures", progress: 0.8)
-            let verification = try await engine.verify(appBundle: appBundle, plan: plan, profile: profile)
+            let verification = try await engine.verify(appBundle: appBundle, plan: plan, profile: request.profile)
             job.issues += verification
             if verification.contains(where: { $0.severity == .error }) {
                 return await finish(&job, state: .failed, reason: "The signed output did not pass verification.", artifact: request.artifact, status: .needsAttention, onUpdate: onUpdate)

@@ -11,6 +11,7 @@ struct SigningWizardView: View {
     @State private var identityID: String?
     @State private var profileID: String?
     @State private var bundleIDOverride = ""
+    @State private var adHoc = false
     @State private var lastJob: SigningJob?
     @State private var isRunning = false
     @State private var shareItem: ShareItem?
@@ -19,7 +20,7 @@ struct SigningWizardView: View {
     private var profile: ProvisioningProfile? { state.profiles.first { $0.id == profileID } }
 
     private var issues: [ValidationIssue] {
-        guard let artifact else { return [] }
+        guard let artifact, !adHoc else { return [] }
         return state.validationIssues(
             artifact: artifact,
             identityID: identityID,
@@ -49,6 +50,13 @@ struct SigningWizardView: View {
                 }
 
                 Section {
+                    Toggle("Ad-hoc (fakesign, no certificate)", isOn: $adHoc)
+                } footer: {
+                    Text(adHoc ? "No certificate or profile is used. The result will not install on a stock iPhone; it is for devices that skip signature checks. Entitlements are kept as they are." : "Signs with your .p12 certificate and .mobileprovision profile.")
+                }
+
+                if !adHoc {
+                Section {
                     Picker("Identity", selection: $identityID) {
                         Text("Choose…").tag(String?.none)
                         ForEach(state.identities) { identity in
@@ -72,6 +80,7 @@ struct SigningWizardView: View {
                     stepHeader(3, "Select a provisioning profile")
                 } footer: {
                     if state.profiles.isEmpty { Text("Import a .mobileprovision in the Profiles tab.") }
+                }
                 }
 
                 if let artifact {
@@ -218,7 +227,8 @@ struct SigningWizardView: View {
             artifact: artifact,
             identityID: identityID,
             profile: profile,
-            targetBundleIdentifier: bundleIDOverride
+            targetBundleIdentifier: bundleIDOverride,
+            adHoc: adHoc
         )
     }
 
