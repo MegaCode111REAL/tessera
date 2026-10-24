@@ -198,8 +198,9 @@ jobs:
             -archivePath "$RUNNER_TEMP/Tessera.xcarchive" 2>&1 | tee "$RUNNER_TEMP/archive.log"
           status=${PIPESTATUS[0]}
           if [[ $status -ne 0 ]]; then
-            grep -E "error:|\*\* ARCHIVE FAILED" "$RUNNER_TEMP/archive.log" | sort -u | head -15 | while IFS= read -r line; do
-              echo "::error::${line:0:600}"
+            grep -iE "error:|provisioning profile|requires a|does not|doesn.t|no certificate|no signing|not found|entitlement" "$RUNNER_TEMP/archive.log" \
+              | grep -v "^\*\* ARCHIVE" | awk '!seen[$0]++' | head -25 | while IFS= read -r line; do
+              echo "::error::${line:0:700}"
             done
           fi
           exit $status
