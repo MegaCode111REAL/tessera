@@ -53,7 +53,7 @@ public enum MachOSigner {
 
     // MARK: - Fat binaries
 
-    private struct FatArch {
+    struct FatArch {
         var cpuType: UInt32
         var cpuSubtype: UInt32
         var offset: Int
