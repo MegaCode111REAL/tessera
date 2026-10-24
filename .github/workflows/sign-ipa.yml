@@ -170,20 +170,39 @@ jobs:
       - name: Archive Tessera for iOS devices
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
+          # Signing settings go on the Tessera target only. Passing them on the command line would
+          # also hit the ZIPFoundation package target, which cannot use a provisioning profile.
+          python3 - <<'PY'
+          import os, re
+          text = open("project.yml").read()
+          extra = {
+              "CODE_SIGN_STYLE": "Manual",
+              "CODE_SIGN_IDENTITY": os.environ["SIGNING_IDENTITY"],
+              "DEVELOPMENT_TEAM": os.environ["IOS_TEAM_ID"],
+              "PROVISIONING_PROFILE_SPECIFIER": os.environ["PROFILE_NAME"],
+              "PRODUCT_BUNDLE_IDENTIFIER": os.environ["IOS_BUNDLE_ID"],
+          }
+          for key, value in extra.items():
+              text = re.sub(r"^(\s+)%s:.*$" % key, "", text, flags=re.M)
+          lines = "".join('        %s: "%s"\n' % (k, v.replace('"', '\\"')) for k, v in extra.items())
+          text = text.replace("      base:\n", "      base:\n" + lines, 1)
+          open("project.yml", "w").write(text)
+          PY
+          xcodegen generate
           xcodebuild archive \
             -project Tessera.xcodeproj \
             -scheme Tessera \
             -configuration Release \
             -destination 'generic/platform=iOS' \
-            -archivePath "$RUNNER_TEMP/Tessera.xcarchive" \
-            CODE_SIGN_STYLE=Manual \
-            CODE_SIGNING_ALLOWED=YES \
-            CODE_SIGNING_REQUIRED=YES \
-            CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" \
-            DEVELOPMENT_TEAM="$IOS_TEAM_ID" \
-            PRODUCT_BUNDLE_IDENTIFIER="$IOS_BUNDLE_ID" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME"
+            -archivePath "$RUNNER_TEMP/Tessera.xcarchive" 2>&1 | tee "$RUNNER_TEMP/archive.log"
+          status=${PIPESTATUS[0]}
+          if [[ $status -ne 0 ]]; then
+            grep -E "error:|\*\* ARCHIVE FAILED" "$RUNNER_TEMP/archive.log" | sort -u | head -15 | while IFS= read -r line; do
+              echo "::error::${line:0:600}"
+            done
+          fi
+          exit $status
 
       - name: Create export options
         shell: bash
