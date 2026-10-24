@@ -107,11 +107,14 @@ public enum SigningError: Error, LocalizedError, Equatable {
 public struct SigningRequest: Sendable {
     public var appBundle: URL
     public var plan: SigningPlan
-    public var identityID: String
-    public var profile: ProvisioningProfile
-    public var profileData: Data
+    /// `nil` requests an ad-hoc signature: no certificate, no profile, entitlements kept as they are.
+    public var identityID: String?
+    public var profile: ProvisioningProfile?
+    public var profileData: Data?
 
-    public init(appBundle: URL, plan: SigningPlan, identityID: String, profile: ProvisioningProfile, profileData: Data) {
+    public var isAdHoc: Bool { identityID == nil }
+
+    public init(appBundle: URL, plan: SigningPlan, identityID: String?, profile: ProvisioningProfile?, profileData: Data?) {
         self.appBundle = appBundle
         self.plan = plan
         self.identityID = identityID
@@ -120,8 +123,8 @@ public struct SigningRequest: Sendable {
     }
 }
 
-/// A code-signing implementation. Tessera ships only `UnavailableSigningEngine` until a
-/// signing approach is verified end-to-end on a real device and the current iOS SDK.
+/// A code-signing implementation. `BundleSigner` is the real one; `UnavailableSigningEngine`
+/// remains for builds that must not sign.
 public protocol SigningEngine: Sendable {
     var capability: SigningCapability { get }
 
@@ -129,7 +132,7 @@ public protocol SigningEngine: Sendable {
     func sign(_ request: SigningRequest, onStep: @Sendable (SigningStep) -> Void) async throws
 
     /// Independently verifies the signatures of a signed bundle and returns any problems found.
-    func verify(appBundle: URL, plan: SigningPlan, profile: ProvisioningProfile) async throws -> [ValidationIssue]
+    func verify(appBundle: URL, plan: SigningPlan, profile: ProvisioningProfile?) async throws -> [ValidationIssue]
 }
 
 /// Honest placeholder: reports signing as unsupported instead of producing a misleading output.
@@ -150,7 +153,7 @@ public struct UnavailableSigningEngine: SigningEngine {
         throw SigningError.unsupported(reason)
     }
 
-    public func verify(appBundle: URL, plan: SigningPlan, profile: ProvisioningProfile) async throws -> [ValidationIssue] {
+    public func verify(appBundle: URL, plan: SigningPlan, profile: ProvisioningProfile?) async throws -> [ValidationIssue] {
         throw SigningError.unsupported(reason)
     }
 }
