@@ -104,8 +104,16 @@ jobs:
             echo "::error::The provisioning profile Team ID does not match IOS_TEAM_ID."
             exit 1
           fi
-          if [[ "$PROFILE_APP_ID" != *".$IOS_BUNDLE_ID" ]]; then
-            echo "::error::The profile application identifier does not match IOS_BUNDLE_ID ($IOS_BUNDLE_ID)."
+          # The profile covers either exactly TEAM.<bundle id> or a wildcard such as TEAM.* / TEAM.com.example.*
+          PROFILE_PATTERN="${PROFILE_APP_ID#*.}"
+          MATCH=false
+          if [[ "$PROFILE_PATTERN" == "$IOS_BUNDLE_ID" || "$PROFILE_PATTERN" == "*" ]]; then
+            MATCH=true
+          elif [[ "$PROFILE_PATTERN" == *"*" && "$IOS_BUNDLE_ID" == "${PROFILE_PATTERN%\*}"* ]]; then
+            MATCH=true
+          fi
+          if [[ "$MATCH" != true ]]; then
+            echo "::error::The profile covers the App ID pattern '$PROFILE_PATTERN' but IOS_BUNDLE_ID is different (length ${#IOS_BUNDLE_ID}, secrets are masked in logs). Set IOS_BUNDLE_ID to a bundle ID the profile allows, with no spaces or newline."
             exit 1
           fi
 
