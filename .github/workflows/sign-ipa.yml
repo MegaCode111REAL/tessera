@@ -78,12 +78,6 @@ jobs:
           echo "::add-mask::$KEYCHAIN_PASSWORD"
           echo "::add-mask::$CERTIFICATE_PASSWORD"
 
-          cleanup() {
-            security delete-keychain "$KEYCHAIN_PATH" >/dev/null 2>&1 || true
-            rm -f "$CERTIFICATE_PATH" "$PROFILE_PATH" "$PROFILE_PLIST"
-          }
-          trap cleanup EXIT
-
           printf '%s' "$CERTIFICATE_BASE64" | base64 -D > "$CERTIFICATE_PATH"
           printf '%s' "$PROFILE_BASE64" | base64 -D > "$PROFILE_PATH"
 
@@ -153,8 +147,6 @@ jobs:
           cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
 
           rm -f "$CERTIFICATE_PATH" "$PROFILE_PATH" "$PROFILE_PLIST"
-          trap 'security delete-keychain "$KEYCHAIN_PATH" >/dev/null 2>&1 || true' EXIT
-
           echo "Imported signing assets. Profile name: $PROFILE_NAME"
           echo "Export method: $EXPORT_METHOD"
 
@@ -237,3 +229,13 @@ jobs:
           path: ${{ runner.temp }}/Tessera-signed.ipa
           if-no-files-found: error
           retention-days: 14
+
+      - name: Clean up signing material
+        if: always()
+        shell: bash
+        run: |
+          security delete-keychain "$RUNNER_TEMP/tessera-signing.keychain-db" >/dev/null 2>&1 || true
+          if [[ -n "${PROFILE_UUID:-}" ]]; then
+            rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+          fi
+          rm -f "$RUNNER_TEMP/signing-certificate.p12" "$RUNNER_TEMP/signing-profile.mobileprovision" "$RUNNER_TEMP/signing-profile.plist"
