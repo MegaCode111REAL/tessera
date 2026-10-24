@@ -47,6 +47,10 @@ openssl pkcs12 -export -inkey dev.key -in dev.pem -out dev.p12
 
 Then create a profile in the portal (it needs your device's UDID) and import the `.p12` and `.mobileprovision` in Tessera. OpenSSL 3 writes `.p12` files with newer encryption that some iOS versions reject; if import reports a wrong password for a correct one, add `-legacy` (or `-certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg sha1`) to the `pkcs12` command. Free Apple IDs have no portal access, so they can't use this route.
 
+## Signed IPA from GitHub Actions (your .p12 + .mobileprovision)
+
+The manual workflow **Build and Sign Tessera IPA** (`.github/workflows/sign-ipa.yml`) archives, signs with Xcode and exports a real signed IPA. Add these repository secrets (Settings > Secrets and variables > Actions): `IOS_CERTIFICATE_BASE64` (`base64 -i cert.p12`), `IOS_CERTIFICATE_PASSWORD`, `IOS_PROVISIONING_PROFILE_BASE64` (`base64 -i profile.mobileprovision`), `IOS_TEAM_ID`, `IOS_BUNDLE_ID` (must match the profile). Then run it from the Actions tab and pick *development*, *ad-hoc* or *app-store-connect*; the IPA is the `Tessera-signed-ipa` artifact. Use a development profile for *development*, a distribution profile for the others.
+
 ## Build
 
 Requires Xcode 16+ on macOS (or just use the CI artifact above).
