@@ -144,16 +144,16 @@ jobs:
               ;;
           esac
 
-          echo "Identities in the .p12:"
-          security find-identity -v -p codesigning "$KEYCHAIN_PATH" | sed -E 's/[0-9A-F]{40}/<sha1>/' || true
-          if ! security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep -Fq "$SIGNING_IDENTITY"; then
+          echo "Identities in the .p12 (including ones the runner does not trust):"
+          security find-identity -p codesigning "$KEYCHAIN_PATH" | sed -E 's/[0-9A-F]{40}/<sha1>/' || true
+          if ! security find-identity -p codesigning "$KEYCHAIN_PATH" | grep -Fq "$SIGNING_IDENTITY"; then
             echo "::error::No usable $SIGNING_IDENTITY certificate in the .p12 for the '$EXPORT_METHOD' export (see the identity list above). Use a matching certificate, or pick the export method that matches your .p12 and profile."
-            security find-identity -v -p codesigning "$KEYCHAIN_PATH" || true
+            security find-identity -p codesigning "$KEYCHAIN_PATH" || true
             exit 1
           fi
 
           # Use the exact certificate name from the .p12 (e.g. "Apple Distribution: Name (TEAM)").
-          SIGNING_IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep -F "$SIGNING_IDENTITY" | head -1 | sed -E 's/^[^"]*"([^"]*)".*$/\1/')"
+          SIGNING_IDENTITY="$(security find-identity -p codesigning "$KEYCHAIN_PATH" | grep -F "$SIGNING_IDENTITY" | head -1 | sed -E 's/^[^"]*"([^"]*)".*$/\1/')"
           {
             echo "PROFILE_UUID=$PROFILE_UUID"
             echo "PROFILE_NAME=$PROFILE_NAME"
