@@ -106,3 +106,19 @@ jobs:
             Tessera-fake-signed.ipa
             Tessera-fake-signed-expired.ipa
           retention-days: 30
+      # Oracle: sign the real Tessera build with Tessera's own engine, then ask Apple's codesign.
+      - name: Ad-hoc sign with Tessera's engine and verify with Apple codesign
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf oracle && mkdir oracle && ditto -x -k Tessera-unsigned.ipa oracle
+          swift build -c release --product tessera-sign
+          .build/release/tessera-sign oracle/Payload/Tessera.app
+          codesign --verify --deep --strict -vvv oracle/Payload/Tessera.app 2>&1 | tee oracle.log
+          codesign -dvvv --entitlements - oracle/Payload/Tessera.app 2>&1 | tee -a oracle.log || true
+      - name: Report oracle result
+        if: always()
+        shell: bash
+        run: |
+          [ -f oracle.log ] && grep -iE "error|invalid|not valid|satisfy|modified|CodeDirectory|Hash|Signature|Identifier" oracle.log | head -20 | while IFS= read -r l; do echo "::warning::oracle: ${l:0:300}"; done || echo "::warning::oracle produced no log"

@@ -9,6 +9,7 @@ let package = Package(
     ],
     products: [
         .library(name: "TesseraCore", targets: ["TesseraCore"]),
+        .executable(name: "tessera-sign", targets: ["tessera-sign"]),
     ],
     dependencies: [
         // MIT-licensed ZIP reader/writer used behind ArchiveEngine / FormatAdapter.
@@ -21,6 +22,11 @@ let package = Package(
                 .product(name: "ZIPFoundation", package: "ZIPFoundation"),
             ],
             path: "Sources/TesseraCore"
+        ),
+        .executableTarget(
+            name: "tessera-sign",
+            dependencies: ["TesseraCore"],
+            path: "Sources/tessera-sign"
         ),
         .testTarget(
             name: "TesseraCoreTests",
