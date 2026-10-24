@@ -49,6 +49,11 @@ jobs:
               exit 1
             fi
           done
+          # Tolerate a pasted newline/whitespace and a leading "TEAMID." on the bundle ID.
+          IOS_TEAM_ID="$(printf '%s' "$IOS_TEAM_ID" | tr -d '[:space:]')"
+          IOS_BUNDLE_ID="$(printf '%s' "$IOS_BUNDLE_ID" | tr -d '[:space:]')"
+          IOS_BUNDLE_ID="${IOS_BUNDLE_ID#"$IOS_TEAM_ID".}"
+          { echo "IOS_TEAM_ID=$IOS_TEAM_ID"; echo "IOS_BUNDLE_ID=$IOS_BUNDLE_ID"; } >> "$GITHUB_ENV"
           if [[ "$IOS_BUNDLE_ID" == *" "* || "$IOS_TEAM_ID" == *" "* ]]; then
             echo "::error::IOS_BUNDLE_ID and IOS_TEAM_ID must not contain spaces."
             exit 1
