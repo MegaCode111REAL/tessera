@@ -129,14 +129,14 @@ jobs:
                 echo "::error::Development export requires a development provisioning profile."
                 exit 1
               fi
-              SIGNING_IDENTITY="Apple Development"
+              SIGNING_IDENTITY="Development"
               ;;
             ad-hoc|app-store-connect)
               if [[ "$PROFILE_GET_TASK_ALLOW" == "true" ]]; then
                 echo "::error::$EXPORT_METHOD export requires a distribution provisioning profile, not a development profile."
                 exit 1
               fi
-              SIGNING_IDENTITY="Apple Distribution"
+              SIGNING_IDENTITY="Distribution"
               ;;
             *)
               echo "::error::Unsupported export method: $EXPORT_METHOD"
@@ -144,12 +144,16 @@ jobs:
               ;;
           esac
 
+          echo "Identities in the .p12:"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH" | sed -E 's/[0-9A-F]{40}/<sha1>/' || true
           if ! security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep -Fq "$SIGNING_IDENTITY"; then
-            echo "::error::No usable $SIGNING_IDENTITY identity found in the imported .p12."
+            echo "::error::No usable $SIGNING_IDENTITY certificate in the .p12 for the '$EXPORT_METHOD' export (see the identity list above). Use a matching certificate, or pick the export method that matches your .p12 and profile."
             security find-identity -v -p codesigning "$KEYCHAIN_PATH" || true
             exit 1
           fi
 
+          # Use the exact certificate name from the .p12 (e.g. "Apple Distribution: Name (TEAM)").
+          SIGNING_IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep -F "$SIGNING_IDENTITY" | head -1 | sed -E 's/^[^"]*"([^"]*)".*$/\1/')"
           {
             echo "PROFILE_UUID=$PROFILE_UUID"
             echo "PROFILE_NAME=$PROFILE_NAME"
