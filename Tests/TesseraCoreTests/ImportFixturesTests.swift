@@ -140,13 +140,14 @@ final class ImportFixturesTests: XCTestCase {
         XCTAssertTrue(artifact.issues.isEmpty, "unexpected findings: \(artifact.issues)")
     }
 
-    func testSignedSampleValidatesCleanlyAgainstItsOwnProfileAndCertificate() async throws {
+    /// The sample's profile covers only the app's own ID, so the extension is (correctly) the one blocker.
+    func testSignedSampleValidatesAgainstItsOwnProfileAndCertificate() async throws {
         let artifact = try await service.importArchive(from: fixture("signed-sample.ipa"))
         let profile = try XCTUnwrap(artifact.metadata.embeddedProfile)
         let identity = Fixtures.identity(id: profile.developerCertificateSHA1s[0])
         let issues = ValidationService(now: { Fixtures.now })
             .validateForSigning(metadata: artifact.metadata, profile: profile, identity: identity)
-        XCTAssertTrue(issues.filter { $0.severity == .error }.isEmpty, "\(issues)")
+        XCTAssertEqual(issues.filter { $0.severity == .error }.map(\.code), ["NESTED_BUNDLE_ID_MISMATCH"], "\(issues)")
     }
 
     /// The binary here is laid out like a linker's output (header padding, __LINKEDIT last) and was
