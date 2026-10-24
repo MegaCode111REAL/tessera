@@ -144,6 +144,14 @@ jobs:
               ;;
           esac
 
+          # Diagnose cert/profile/team mismatches without printing secrets.
+          security find-certificate -a -p "$KEYCHAIN_PATH" > "$RUNNER_TEMP/certs.pem" 2>/dev/null || true
+          CERT_OU="$(openssl x509 -in "$RUNNER_TEMP/certs.pem" -noout -subject -nameopt multiline 2>/dev/null | awk '/organizationalUnitName/ {print $3}' | head -1 || true)"
+          CERT_SHA1="$(openssl x509 -in "$RUNNER_TEMP/certs.pem" -noout -fingerprint -sha1 2>/dev/null | cut -d= -f2 | tr -d ':' || true)"
+          PROFILE_CERT_SHA1S="$(/usr/libexec/PlistBuddy -x -c 'Print :DeveloperCertificates' "$PROFILE_PLIST" 2>/dev/null | python3 -c "import plistlib,sys,hashlib; print(' '.join(hashlib.sha1(c).hexdigest().upper() for c in plistlib.loads(sys.stdin.buffer.read())))" 2>/dev/null || true)"
+          echo "Certificate team (OU): $CERT_OU | profile/secret team: $IOS_TEAM_ID"
+          if [[ "$PROFILE_CERT_SHA1S" == *"$CERT_SHA1"* && -n "$CERT_SHA1" ]]; then echo "The profile includes this certificate."; else echo "::error::The provisioning profile does NOT include the certificate in your .p12. Regenerate the profile and tick this exact certificate."; fi
+          if [[ -n "$CERT_OU" && "$CERT_OU" != "$IOS_TEAM_ID" ]]; then echo "::error::The certificate belongs to team $CERT_OU but IOS_TEAM_ID is $IOS_TEAM_ID. The certificate, profile and IOS_TEAM_ID must all be from the same team."; fi
           echo "Identities in the .p12 (including ones the runner does not trust):"
           security find-identity -p codesigning "$KEYCHAIN_PATH" | sed -E 's/[0-9A-F]{40}/<sha1>/' || true
           if ! security find-identity -p codesigning "$KEYCHAIN_PATH" | grep -Fq "$SIGNING_IDENTITY"; then
