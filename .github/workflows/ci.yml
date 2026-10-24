@@ -13,7 +13,23 @@ jobs:
       - name: Swift version
         run: swift --version
       - name: Test TesseraCore
-        run: swift test
+        shell: bash
+        run: |
+          set -o pipefail
+          swift test 2>&1 | tee swift-test.log
+      # Job logs can't always be downloaded, so surface failures as annotations too.
+      - name: Summarise test failures
+        if: failure()
+        shell: bash
+        run: |
+          grep -E "error:|XCTAssert|failed \(" swift-test.log | sed 's/%/%25/g' | head -45 | while IFS= read -r line; do
+            echo "::error::${line:0:900}"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swift-test-log
+          path: swift-test.log
       - name: Test fake-signing script
         run: python3 scripts/test_fake_sign.py
 
